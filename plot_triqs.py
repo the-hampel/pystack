@@ -150,12 +150,12 @@ def extract_Z_visual(h5, order=4, start=0, fitpoints=7, imp=0, plot=False, it='l
 
     return Z_t2g, Z_eg, scat_t2g, scat_eg
 
-def plot_conv(h5_files):
+def plot_conv(h5_files, dpi=120):
     if type(h5_files) != list:
         h5_files = [h5_files]
 
-    fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2,figsize=(22,14))
-    fig.subplots_adjust(wspace=0.15,hspace=0.05)
+    fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2,2,figsize=(14,10), dpi=dpi, sharex=True)
+    fig.subplots_adjust(wspace=0.25,hspace=0.05)
 
     for i, h5 in enumerate(h5_files):
         with HDFArchive(h5,'r') as h5:
@@ -169,9 +169,6 @@ def plot_conv(h5_files):
 
         ax1.plot(conv_obs['d_mu'],'-o',label=str(i)+' d mu')
 
-
-        ax1.set_ylim(0.0,conv_obs['d_mu'][2])
-
         ax1.set_ylabel(r"delta")
 
 
@@ -182,30 +179,27 @@ def plot_conv(h5_files):
         #############
 
         for imp in range(n_imp):
-            ax2.plot(conv_obs['d_Gimp'][imp],'-o',label=str(i)+' dGimp')
+            ax2.semilogy(conv_obs['d_Gimp'][imp],'-o',label=str(i)+' dGimp')
 
 
-        ax2.set_ylim(0.0,conv_obs['d_Gimp'][0][2])
         ax2.set_ylabel(r"delta Gimp")
 
         ax2.legend(loc='lower left', ncol=1,numpoints=1,handlelength=1,fancybox=True,
                    labelspacing=0.2,borderaxespad=0.5,borderpad=0.35,handletextpad=0.4)
 
         for imp in range(n_imp):
-            ax3.plot(conv_obs['d_G0'][imp],'-o',label=str(i)+' d G0')
+            ax3.semilogy(conv_obs['d_G0'][imp],'-o',label=str(i)+' d G0')
 
         ax3.set_xlabel(r"it")
         ax3.set_ylabel(r"delta G0")
-        ax3.set_ylim(0.0,conv_obs['d_G0'][0][3])
         ax3.legend(loc='lower left', ncol=1,numpoints=1,handlelength=1,fancybox=True,
                    labelspacing=0.2,borderaxespad=0.5,borderpad=0.35,handletextpad=0.4)
 
         for imp in range(n_imp):
-            ax4.plot(conv_obs['d_Sigma'][imp],'-o',label=str(i)+' d Sigma')
+            ax4.semilogy(conv_obs['d_Sigma'][imp],'-o',label=str(i)+' d Sigma')
 
         ax4.set_xlabel(r"it")
         ax4.set_ylabel(r"delta Sigma")
-        ax4.set_ylim(0.0,conv_obs['d_Sigma'][0][2])
         ax4.legend(loc='lower left', ncol=1,numpoints=1,handlelength=1,fancybox=True,
                    labelspacing=0.2,borderaxespad=0.5,borderpad=0.35,handletextpad=0.4)
 
@@ -267,10 +261,10 @@ def plot_G_S(h5,block,orb,imp=0,it='last_iter', w_max=30):
     fig, (ax1,ax3) = plt.subplots(1,2,figsize=(2.6*width,width))
     fig.subplots_adjust(wspace=0.3)
 
-    ax1.oplot(G_iw[block][orb,orb].real,'-',color='C3',label='Re')
+    ax1.oplot(G_iw[block][orb,orb].real,'-',color='C2',label='Re')
 
     ax2 = ax1.twinx()
-    ax2.oplot(G_iw[block][orb,orb].imag,'-',color='C2',label='Im')
+    ax2.oplot(G_iw[block][orb,orb].imag,'-',color='C3',label='Im')
 
 
     ax1.set_xlim(0,w_max)
@@ -285,10 +279,10 @@ def plot_G_S(h5,block,orb,imp=0,it='last_iter', w_max=30):
     ax1.tick_params(direction='in',pad=2)
 
     # Sigma
-    ax3.oplot(S_iw[block][orb,orb].real,'-',color='C3',label='Re')
+    ax3.oplot(S_iw[block][orb,orb].real,'-',color='C2',label='Re')
 
     ax4 = ax3.twinx()
-    ax4.oplot(S_iw[block][orb,orb].imag,'-',color='C2',label='Im')
+    ax4.oplot(S_iw[block][orb,orb].imag,'-',color='C3',label='Im')
 
     ax3.set_xlim(0,w_max)
     ax3.set_ylabel(r"$Re \Sigma (i \omega)$")

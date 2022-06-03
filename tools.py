@@ -223,3 +223,34 @@ def extract_bandwidth_h5(h5):
     
     
     return abs(ev_max-ev_min)
+
+def double_counting_ani(U, J, n_orb, occ):
+    
+    '''
+    small function to calculate double counting via Held / Anisimov formula for Kanamori Hamiltonians
+    
+    parameters
+    ----------
+    U : float
+        U value
+    J : float
+        J value
+    n_orb : int
+        number of orbitals
+    occ : float 
+        nomber of electrons
+        
+    returns
+    -------
+    dc_pot : float 
+        double counting potential
+    dc_en : float
+        double counting energy
+    '''
+    
+    U_bar = (U + (n_orb-1)*(U-2*J) + (n_orb-1)*(U-3*J))/(2*n_orb -1)
+    
+    dc_en = 0.5*U_bar*occ*(occ-1)
+    dc_pot = U_bar*(occ-0.5)
+    
+    return dc_pot, dc_en
