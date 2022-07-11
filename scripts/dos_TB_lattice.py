@@ -34,11 +34,13 @@ start_time = timer()
 TB = TB_from_wannier90(seed=w90_seed, path=w90_path,
                        extend_to_spin=spin, add_local=np.diag([-dft_fermi] * n_orb))
 
-k_mesh = TB.get_kmesh(n_k=(k_dim, k_dim, k_dim))
-k_array = np.array(list(k_mesh.values()))
-n_k = len(k_mesh)
+d_start_time = timer()
 
-# omega mesh, mu, and eta matrix vectors for each frequency
+k_spacing = np.linspace(0, 1, k_dim, endpoint=False)
+k_array = np.array(np.meshgrid(k_spacing, k_spacing, k_spacing)).T.reshape(-1, 3)
+n_k = k_dim**3
+
+# # omega mesh, mu, and eta matrix vectors for each frequency
 w_mesh = MeshReFreq(omega_min=-omega_range, omega_max=omega_range, n_max=n_omega)
 w_mat = np.array([w.value * np.eye(n_orb) for w in w_mesh])
 mu_mat = mu * np.eye(n_orb)
@@ -48,12 +50,18 @@ wk = 1/n_k
 # local Gf for spectral function
 Gloc = Gf(mesh=w_mesh, target_shape=[n_orb, n_orb])
 
+mpi.report('time for setup: {:.2f} s'.format(timer() - start_time))
+
 # Loop on k points via MPI
-k_start_time = timer()
+trafo_start_time = timer()
 
 k_array_slice = mpi.slice_array(k_array)
 h_k_mat_slice = TB.fourier(k_array_slice)
 
+mpi.barrier()
+mpi.report('time for Fourier trafo to H(k): {:.2f} s'.format(timer() - trafo_start_time))
+
+k_start_time = timer()
 # loop over slice on each rank and calc Gloc contribution
 for h_k_mat in h_k_mat_slice:
     Gloc.data[:, :, :] += wk * np.linalg.inv(w_mat[:] + mu_mat - h_k_mat + eta_mat)
