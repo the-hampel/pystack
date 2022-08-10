@@ -9,31 +9,56 @@ from triqs_dft_tools.converters import Wannier90Converter
 
 import numpy as np
 
-np.set_printoptions(precision=4, suppress= True)
+np.set_printoptions(precision=4, suppress=True)
 
-if mpi.is_master_node():
-    Converter = Wannier90Converter(seedname='wannier90', rot_mat_type='hloc_diag')
-    Converter.convert_dft_input()
+################
+### Params #####
+seed = 'ce2o3'
+store = True
+################
 
-sum_k = SumkDFTTools(hdf_file = 'wannier90.h5' , use_dft_blocks = False)
+Converter = Wannier90Converter(seedname=seed, rot_mat_type='hloc_diag')
+Converter.convert_dft_input()
 
-sum_k.set_mu(0.016795)
-# sum_k.calc_mu()
+sum_k = SumkDFT(hdf_file=seed+'.h5', use_dft_blocks=False)
+
+# sum_k.set_mu(14.737167)
+sum_k.calc_mu()
 
 Sigma = sum_k.block_structure.create_gf(beta=100)
 sum_k.put_Sigma([Sigma])
-Gloc = sum_k.extract_G_loc()[0]
+Gloc = sum_k.extract_G_loc()
 
-density_shell = np.real(Gloc.total_density())
-mpi.report('Total charge of impurity problem = {:.4f}'.format(density_shell))
-density_mat = Gloc.density()
-mpi.report('Density matrix:')
-for key, value in density_mat.items():
-    mpi.report(key)
-    mpi.report(np.real(value))
+if mpi.is_master_node():
+    Gloc_new = sum_k.analyse_block_structure_from_gf(Gloc, threshold=1e-04)
 
-mpi.report('calculating local Hamiltonian')
-atomic_levels = sum_k.eff_atomic_levels()[0]
-for name, matrix in atomic_levels.items():
-    mpi.report(matrix.real)
+    for ishell, gloc in enumerate(Gloc_new):
+        print(f'correlated shell {ishell}:')
+        density_shell = np.real(gloc.total_density())
 
+        print('Total charge of impurity problem = {:.4f}'.format(density_shell))
+        density_mat = gloc.density()
+        print('Density matrix:')
+        for key, value in density_mat.items():
+            print(key)
+            print(np.real(value))
+            if np.any(np.imag(value) > 1e-4):
+                print('Im:')
+                print(np.imag(value))
+
+        print('---')
+        print('calculating local Hamiltonian in block structure:')
+        atomic_levels = sum_k.eff_atomic_levels()[ishell]
+        solver_eal = sum_k.block_structure.convert_matrix(atomic_levels, space_from='sumk')
+        for name, matrix in solver_eal.items():
+            print(name)
+            print(matrix.real)
+            if np.any(np.imag(matrix) > 1e-4):
+                print('Im:')
+                print(np.imag(matrix))
+        print('---------------------------------------------------')
+
+        if store:
+            with HDFArchive(seed+'.h5', 'a') as h5:
+                h5['Gloc_iw'] = Gloc_new
+                h5['Hloc'] = solver_eal
