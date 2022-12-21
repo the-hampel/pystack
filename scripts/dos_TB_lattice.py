@@ -10,16 +10,16 @@ from h5 import HDFArchive
 # parameters
 k_dim = 41
 omega_range = 3
-n_omega = 1001
+n_omega = 3001
 dft_fermi = 7.5689906322
 mu = 0.0
 n_orb = 3
-eta = 0.05
+eta = 0.01
 w90_seed = 'wannier90'
 w90_path = '/mnt/home/ahampel/work/GW+DMFT/GW-benchmark/SMO/triqs-cubic/scf/'
 spin = None
-store = 'dos.h5'
-plot = w90_seed+'_dos.pdf'
+store = 'Aw.h5'
+plot = 'dos.pdf'
 # ------------------------------#
 
 if spin:

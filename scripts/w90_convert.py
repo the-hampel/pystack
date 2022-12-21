@@ -20,7 +20,8 @@ store = True
 Converter = Wannier90Converter(seedname=seed, rot_mat_type='hloc_diag')
 Converter.convert_dft_input()
 
-sum_k = SumkDFT(hdf_file=seed+'.h5', use_dft_blocks=False)
+mesh = MeshImFreq(beta=40, S='Fermion', n_iw=1025)
+sum_k = SumkDFT(hdf_file=seed+'.h5', mesh=mesh)
 
 # sum_k.set_mu(14.737167)
 sum_k.calc_mu()

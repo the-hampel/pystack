@@ -254,3 +254,17 @@ def double_counting_ani(U, J, n_orb, occ):
     dc_pot = U_bar*(occ-0.5)
     
     return dc_pot, dc_en
+
+def mesh_to_np_arr(mesh):
+    from triqs.gf import MeshImTime, MeshReFreq, MeshImFreq
+    
+    if isinstance(mesh, MeshReFreq):
+        mesh_arr = np.linspace(mesh.omega_min, mesh.omega_max, len(mesh))
+    elif isinstance(mesh, MeshImFreq):
+        mesh_arr = np.linspace(mesh(mesh.first_index()).imag, mesh(mesh.last_index()).imag, len(mesh))
+    elif isinstance(mesh, MeshImTime):
+        mesh_arr = np.linspace(0, mesh.beta, len(mesh))
+    else:
+        raise AttributeError('input mesh must be either MeshReFreq, MeshImFreq, or MeshImTime')
+        
+    return mesh_arr
