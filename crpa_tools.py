@@ -89,7 +89,7 @@ def calc_U_iw(U_w, beta=40, n_iw = 10001, V=None, plot=True, fit_w0=False, fitpo
 
         ax1.plot(iw_mesh_np,U_iw.data[:,0,0].real,'o')
 
-        plt.xlim(0,5)
+        plt.xlim(0,3)
         plt.ylim(U_iw.data[int(len(iw_mesh_np)/2)].real,U_iw.data[int(len(iw_mesh_np)/2)].real+3)
         plt.ylabel(r'$U_{scr}(i \nu_n)$')
         plt.xlabel(r'$i \nu_n$')
@@ -99,7 +99,7 @@ def calc_U_iw(U_w, beta=40, n_iw = 10001, V=None, plot=True, fit_w0=False, fitpo
 
         ax1.plot(iw_mesh_np,U_iw.data[:,0,0].real,'-')
 
-        plt.xlim(0,200)
+        plt.xlim(0,)
         plt.ylim(U_iw.data[int(len(iw_mesh_np)/2)].real,U_iw.data[-1].real)
         plt.ylabel(r'$U_{scr}(i \nu_n)$')
         plt.xlabel(r'$i \nu_n$')

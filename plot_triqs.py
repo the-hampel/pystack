@@ -2,6 +2,7 @@ from triqs.gf import *
 from h5 import HDFArchive
 import os
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
 
 import numpy as np
 import scipy as sp
@@ -22,18 +23,27 @@ def smooth(y, box_pts):
 def extract_obs(h5):
     with HDFArchive(h5, 'r') as ar:
         obs = ar['DMFT_results']['observables']
+        conv_obs = ar['DMFT_results/convergence_obs']
 
     obs['n_imp'] = len(obs['orb_occ'][:])
 
     obs['orb_occ_sum'] = []
     obs['orb_gb2_sum'] = []
+    obs['orb_mag_mom'] = []
+    obs['imp_mag_mom'] = []
     obs['n_orb'] = []
     for imp in range(0, obs['n_imp']):
-        obs['orb_occ_sum'].append(np.array(obs['orb_occ'][0]['up'])+np.array(obs['orb_occ'][0]['down']))
-        obs['orb_gb2_sum'].append(np.array(obs['orb_gb2'][0]['up'])+np.array(obs['orb_gb2'][0]['down']))
+        obs['orb_occ_sum'].append(np.array(obs['orb_occ'][imp]['up'])
+                                  + np.array(obs['orb_occ'][imp]['down']))
+        obs['orb_gb2_sum'].append(np.array(obs['orb_gb2'][imp]['up'])
+                                  + np.array(obs['orb_gb2'][imp]['down']))
+        obs['orb_mag_mom'].append(np.array(obs['orb_occ'][imp]['up'])
+                                  - np.array(obs['orb_occ'][imp]['down']))
+        obs['imp_mag_mom'].append(np.array(obs['imp_occ'][imp]['up'])
+                                  - np.array(obs['imp_occ'][imp]['down']))
         obs['n_orb'].append(obs['orb_occ_sum'][imp].shape[1])
 
-    return obs
+    return obs, conv_obs
 
 
 def fit_tail(S_iw, nmin, nmax, order=4, known_moments=[], block='up_0', orb=0, xlim=(0, 40), ylim=(-1.5, 0.1)):
@@ -56,7 +66,8 @@ def fit_tail(S_iw, nmin, nmax, order=4, known_moments=[], block='up_0', orb=0, x
         tail, err = S_iw_mfit[block].fit_hermitian_tail_on_window(n_min=nmin,
                                                                   n_max=nmax,
                                                                   known_moments=known_moments,
-                                                                  n_tail_max=2 * len(S_iw_mfit.mesh),
+                                                                  n_tail_max=2 *
+                                                                  len(S_iw_mfit.mesh),
                                                                   expansion_order=order)
 
         S_iw_mfit[block].replace_by_tail(tail, nmax)
@@ -123,7 +134,8 @@ def extract_Z_visual(h5, order=4, start=0, fitpoints=7, imp=0, plot=False, it='l
                 # simple extraction from S_iw_0
                 Z_simple = 1/(1 - (Im_S_iw[n_iw0+start]/iw[n_iw0+start]))
 
-                p_fit = np.polyfit(iw[n_iw0+start:n_iw0+start+fitpoints], Im_S_iw[n_iw0+start:n_iw0+start+fitpoints], order)
+                p_fit = np.polyfit(iw[n_iw0+start:n_iw0+start+fitpoints],
+                                   Im_S_iw[n_iw0+start:n_iw0+start+fitpoints], order)
                 p_der = np.polyder(p_fit)
                 Z_fit = 1.0/(1.0 - np.polyval(p_der, 0.0))
                 scat_fit = -1*np.polyval(p_fit, 0.0)
@@ -150,144 +162,155 @@ def extract_Z_visual(h5, order=4, start=0, fitpoints=7, imp=0, plot=False, it='l
     return Z_t2g, Z_eg, scat_t2g, scat_eg
 
 
-def plot_conv(h5_files, dpi=120):
-    if type(h5_files) != list:
-        h5_files = [h5_files]
+def plot_conv_obs(h5, site=0, dpi=120):
+    obs, conv_obs = extract_obs(h5)
 
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(14, 10), dpi=dpi, sharex=True)
-    fig.subplots_adjust(wspace=0.25, hspace=0.05)
+    markers = ['o', 's', 'x', 'v', '^', '1', '2', '3', '4', '5']
+    n_orb = obs['orb_occ'][site]['up'][0].shape[0]
 
-    for i, h5 in enumerate(h5_files):
-        with HDFArchive(h5, 'r') as h5:
-            conv_obs = h5['DMFT_results']['convergence_obs']
+    fig, ax = plt.subplots(nrows=7, dpi=dpi, figsize=(10, 14), sharex=True)
+    fig.subplots_adjust(wspace=0.04, hspace=0.05)
 
-        n_imp = len(conv_obs['d_imp_occ'])
+    # chemical potential
+    ax[0].plot(obs['iteration'], obs['mu'], '-o', color='C3')
+    ax[0].set_ylabel(r'$\mu$ (eV)')
 
-        for imp in range(n_imp):
-            ax1.plot(conv_obs['d_imp_occ'][imp], '-o', label=str(i)+' d imp')
+    # orb occupation
+    for i_orb in range(n_orb):
+        ax[1].plot(obs['iteration'], obs['orb_occ_sum'][site][:, i_orb],
+                   marker=markers[i_orb], label=f'orb {i_orb}')
+    ax[1].set_ylabel('orb occ')
+    ax[1].legend()
 
-        ax1.plot(conv_obs['d_mu'], '-o', label=str(i)+' d mu')
+    # A(w=0)
+    for i_orb in range(n_orb):
+        ax[2].plot(obs['iteration'], -1*obs['orb_gb2_sum'][site][:, i_orb], marker=markers[i_orb])
+    ax[2].set_ylim(0,)
+    ax[2].set_ylabel(r'$\bar{A}(\omega=0$)')
 
-        ax1.set_ylabel(r"delta")
+    # Z
+    Z = 0.5*(np.array(obs['orb_Z'][site]['up'])+np.array(obs['orb_Z'][site]['down']))
+    for i_orb in range(n_orb):
+        ax[3].plot(obs['iteration'], Z[:, i_orb], marker=markers[i_orb])
+    ax[3].set_ylabel(r'QP weight Z')
 
-        ax1.legend(loc='lower left', ncol=1, numpoints=1, handlelength=1, fancybox=True,
-                   labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
+    # convergence of Weiss field
+    ax[4].semilogy(obs['iteration'][1:], conv_obs['d_G0'][site], '-o', color='C4')
+    ax[4].set_ylabel(r'$\Delta$ G$_0$')
 
-        #############
+    # convergence of DMFT self-consistency condition Gimp-Gloc
+    ax[5].semilogy(obs['iteration'][1:], conv_obs['d_Gimp'][site], '-o', color='C5')
+    ax[5].set_ylabel(r'|G$_{imp}$-G$_{loc}$|')
 
-        for imp in range(n_imp):
-            ax2.semilogy(conv_obs['d_Gimp'][imp], '-o', label=str(i)+' dGimp')
+    # chemical potential diff
+    ax[6].semilogy(obs['iteration'][2:], np.abs(
+        np.array(obs['mu'][2:])-np.array(obs['mu'][0:-2])), '-o', color='C6')
+    ax[6].set_ylabel(r'$\Delta \ \mu$ (eV)')
 
-        ax2.set_ylabel(r"delta Gimp")
-
-        ax2.legend(loc='lower left', ncol=1, numpoints=1, handlelength=1, fancybox=True,
-                   labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
-
-        for imp in range(n_imp):
-            ax3.semilogy(conv_obs['d_G0'][imp], '-o', label=str(i)+' d G0')
-
-        ax3.set_xlabel(r"it")
-        ax3.set_ylabel(r"delta G0")
-        ax3.legend(loc='lower left', ncol=1, numpoints=1, handlelength=1, fancybox=True,
-                   labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
-
-        for imp in range(n_imp):
-            ax4.semilogy(conv_obs['d_Sigma'][imp], '-o', label=str(i)+' d Sigma')
-
-        ax4.set_xlabel(r"it")
-        ax4.set_ylabel(r"delta Sigma")
-        ax4.legend(loc='lower left', ncol=1, numpoints=1, handlelength=1, fancybox=True,
-                   labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
-
+    ax[-1].set_xticks(range(0, len(obs['iteration'])))
+    ax[-1].set_xlabel('Iterations')
+    ax[-1].set_xlim(0,)
+    ax[-1].xaxis.set_minor_locator(MultipleLocator(1))
     plt.show()
-    return
+
+    return obs, conv_obs
 
 
-def plot_Gl_coeff(h5, block, orb, imp=0, it='last_iter'):
+def plot_Gl_coeff(h5, block, orb, ax, imp=0, it='last_iter'):
     from triqs.plot.mpl_interface import plt, oplot
     with HDFArchive(h5, 'r') as ar:
         Gl = ar['DMFT_results'][it]['Gimp_l_'+str(imp)]
         S_iw = ar['DMFT_results'][it]['Sigma_freq_'+str(imp)]
 
-    # latex columnwidth is 246pt : 3.41667 inch and with tight padding 1.12 is the factor!
-    width = 1.7*1.07*3.41667
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(2.6*width, width))
-
     nl = range(0, len(Gl[block][orb, orb].data[:].real), 1)[0::2]
-    ax1.semilogy(nl, (np.abs(Gl[block][orb, orb].data[0::2])), "o-", color='C0', label="$G_l$  even", linewidth=1.5)
+    ax[0].semilogy(nl, (np.abs(Gl[block][orb, orb].data[0::2])), "o-",
+                   color='C0', label="$G_l$  even", linewidth=1.5)
 
     nl_odd = range(0, len(Gl[block][orb, orb].data[:].real), 1)[1::2]
-    ax1.semilogy(nl_odd, (np.abs(Gl[block][orb, orb].data[1::2])), "x-", color='C1', label="$G_l$  odd", linewidth=1.5)
+    ax[0].semilogy(nl_odd, (np.abs(Gl[block][orb, orb].data[1::2])),
+                   "x-", color='C1', label="$G_l$  odd", linewidth=1.5)
 
-    ax1.set_xlabel(r"$l$")
-    ax1.set_ylabel(r"$|$G$_{l}|$")
+    ax[0].set_xlabel(r"$l$")
+    ax[0].set_ylabel(r"$|$G$_{l}|$")
 
-    ax1.xaxis.set_ticks_position('both')
-    ax1.legend(loc='upper right', ncol=1, numpoints=1, handlelength=1, fancybox=True,
-               labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
-    ax1.tick_params(direction='in', pad=2)
+    ax[0].xaxis.set_ticks_position('both')
+    ax[0].legend(loc='upper right', ncol=1, numpoints=1, handlelength=1, fancybox=True,
+                 labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
+    ax[0].tick_params(direction='in', pad=2)
 
     # Sigma
-    ax2.oplot(S_iw[block][orb, orb].imag, '-', color='C3', label='Im')
+    ax[1].oplot(S_iw[block][orb, orb].imag, '-', color='C3', label='Im')
 
-    ax3 = ax2.twinx()
-    ax3.oplot(S_iw[block][orb, orb].real, '-', color='C2', label='Re')
+    ax_twin = ax[1].twinx()
+    ax_twin.oplot(S_iw[block][orb, orb].real, '-', color='C2', label='Re')
 
-    ax2.set_xlim(0, 25)
-    ax2.set_ylabel(r"$Re \Sigma (i \omega)$")
-    ax3.set_ylabel(r"$Im \Sigma (i \omega)$")
+    ax[1].set_xlim(0, 25)
+    ax[1].set_ylabel(r"$Re \Sigma (i \omega)$")
+    ax_twin.set_ylabel(r"$Im \Sigma (i \omega)$")
 
-    ax2.legend(loc='upper left', ncol=1, numpoints=1, handlelength=1, fancybox=True,
-               labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
+    ax[1].legend(loc='upper left', ncol=1, numpoints=1, handlelength=1, fancybox=True,
+                 labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
     plt.show()
 
     return
 
 
-def plot_G_S(h5, block, orb, imp=0, it='last_iter', w_max=30):
+def plot_G_S(h5, block, orb, ax, imp=0, it='last_iter', w_max=30):
 
     with HDFArchive(h5, 'r') as ar:
         G_iw = ar['DMFT_results'][it]['Gimp_freq_'+str(imp)]
         S_iw = ar['DMFT_results'][it]['Sigma_freq_'+str(imp)]
 
-    # latex columnwidth is 246pt : 3.41667 inch and with tight padding 1.12 is the factor!
-    width = 1.7*1.07*3.41667
+    ax[0].oplot(G_iw[block][orb, orb].real, '-', color='C2', label='Re')
 
-    fig, (ax1, ax3) = plt.subplots(1, 2, figsize=(2.6*width, width))
-    fig.subplots_adjust(wspace=0.3)
+    ax1_twin = ax[0].twinx()
+    ax1_twin.oplot(G_iw[block][orb, orb].imag, '-', color='C3', label='Im')
 
-    ax1.oplot(G_iw[block][orb, orb].real, '-', color='C2', label='Re')
+    ax[0].set_xlim(0, w_max)
+    ax[0].set_ylabel(r"$Re G (i \omega)$")
+    ax1_twin.set_ylabel(r"$Im G (i \omega)$")
 
-    ax2 = ax1.twinx()
-    ax2.oplot(G_iw[block][orb, orb].imag, '-', color='C3', label='Im')
-
-    ax1.set_xlim(0, w_max)
-    ax1.set_ylabel(r"$Re G (i \omega)$")
-    ax2.set_ylabel(r"$Im G (i \omega)$")
-
-    ax1.xaxis.set_ticks_position('both')
-    ax1.legend(loc='upper left', ncol=1, numpoints=1, handlelength=1, fancybox=True,
-               labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
-    ax2.legend(loc='upper right', ncol=1, numpoints=1, handlelength=1, fancybox=True,
-               labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
-    ax1.tick_params(direction='in', pad=2)
+    ax[0].xaxis.set_ticks_position('both')
+    ax[0].legend(loc='upper left', ncol=1, numpoints=1, handlelength=1, fancybox=True,
+                 labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
+    ax1_twin.legend(loc='upper right', ncol=1, numpoints=1, handlelength=1, fancybox=True,
+                    labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
+    ax[0].tick_params(direction='in', pad=2)
 
     # Sigma
-    ax3.oplot(S_iw[block][orb, orb].real, '-', color='C2', label='Re')
+    ax[1].oplot(S_iw[block][orb, orb].real, '-', color='C2', label='Re')
 
-    ax4 = ax3.twinx()
-    ax4.oplot(S_iw[block][orb, orb].imag, '-', color='C3', label='Im')
+    ax_twin2 = ax[1].twinx()
+    ax_twin2.oplot(S_iw[block][orb, orb].imag, '-', color='C3', label='Im')
 
-    ax3.set_xlim(0, w_max)
-    ax3.set_ylabel(r"$Re \Sigma (i \omega)$")
-    ax4.set_ylabel(r"$Im \Sigma (i \omega)$")
+    ax[1].set_xlim(0, w_max)
+    ax[1].set_ylabel(r"$Re \Sigma (i \omega)$")
+    ax_twin2.set_ylabel(r"$Im \Sigma (i \omega)$")
 
-    ax3.legend(loc='upper left', ncol=1, numpoints=1, handlelength=1, fancybox=True,
-               labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
-    ax4.legend(loc='upper right', ncol=1, numpoints=1, handlelength=1, fancybox=True,
-               labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
-    plt.show()
+    ax[1].legend(loc='upper left', ncol=1, numpoints=1, handlelength=1, fancybox=True,
+                 labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
+    ax_twin2.legend(loc='upper right', ncol=1, numpoints=1, handlelength=1, fancybox=True,
+                    labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
+
+    return
+
+
+def plot_pert_order(h5, it='last_iter', o_max=None, dpi=120):
+    from triqs_cthyb import Solver
+
+    with HDFArchive(h5, 'r') as ar:
+        pert_ord = ar['DMFT_results'][it]['pert_order_imp_0']
+
+    fig, ax = plt.subplots(1, 1, figsize=(9, 4), dpi=dpi, squeeze=False, sharex=True)
+    ax = ax.reshape(-1)
+
+    for b in pert_ord:
+        if 'down' in b:
+            continue
+        ax[0].oplot(pert_ord[b], label='block {:s}'.format(b))
+
+    if o_max:
+        ax[0].set_xlim(0, o_max)
 
     return
 

@@ -6,25 +6,13 @@ import scipy as sp
 import scipy.integrate as integrate
 
 def set_plot_params():
-    np.set_printoptions(precision=6,suppress=True, linewidth=140)
+    import seaborn as sns
+    import scienceplots
+    np.set_printoptions(precision=6, suppress=True, linewidth=200)
     # set matplotlib parameters
-    params = {'backend': 'svg',
-              'axes.labelsize': 14,
-              'lines.linewidth': 2,
-              'lines.markersize':8,
-              'xtick.top': True,
-              'ytick.right': True,
-              'ytick.direction': 'in',
-              'xtick.direction': 'in',
-              'font.size': 14,
-              'legend.fontsize': 12,
-              'xtick.labelsize': 14,
-              'ytick.labelsize': 14,
-              'text.usetex': False,
-              'text.latex.preamble' : [r'\usepackage{mathpazo}',r'\usepackage{amsmath}'],
-              'font.family': 'serif'}
-    #           'font.sans-serif': ['Computer Modern serif']}
-    plt.rcParams.update(params)
+    # notebook switches of latex rendering
+    plt.style.use(['science','notebook'])
+    sns.set_palette('muted')
 
 def rotation_matrix(axis, theta):
     import numpy as np
@@ -46,6 +34,47 @@ def rotation_matrix(axis, theta):
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
 
 
+def find_supercell(prim_cell, super_cell):
+    
+    '''
+    Given two paths to a structure file, returns the transformation M from 
+    primitive to supercell and the corresponding reciprocal transformation
+    matrix. For more info see:
+    math.stackexchange.com/questions/1078157/components-of-vector-in-dual-basis-transform-covariantly
+    
+    and
+    
+    github.com/QijingZheng/VaspBandUnfolding/blob/master/unfold.py
+    
+    Let M the transformation matrix between supercell and primitive cell,
+    and A the column wise supercell vectors and a the column wise primitive
+    cell vectors. Then M is given as:
+            M = np.dot(A, np.linalg.inv(a)) 
+    
+    In real space, the basis vectors of Supercell (A) and those of the
+    primitive cell (a) satisfy:
+            A = np.dot(M, a);      a = np.dot(np.linalg.inv(M), A)
+    
+    Whereas in reciprocal space
+            b = np.dot(M.T, B);    B = np.dot(np.linalg.inv(M).T, b)            
+    
+    uses pymatgen to load structure files and match the structures
+            
+    '''
+    
+    from pymatgen.analysis.structure_matcher import StructureMatcher
+    from pymatgen.core import Structure
+    
+    PC = Structure.from_file(prim_cell)
+    SC = Structure.from_file(super_cell)
+    
+    sm = StructureMatcher(primitive_cell=False, attempt_supercell=True)
+    
+    trans, shift, match_atoms = sm.get_transformation(SC, PC)
+    
+    k_trans = np.linalg.inv(trans).T
+    
+    return trans, k_trans, shift
 
 def ext_fermi_energy(path):
     "extracting the fermi energy"
