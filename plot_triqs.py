@@ -46,53 +46,35 @@ def extract_obs(h5):
     return obs, conv_obs
 
 
-def fit_tail(S_iw, nmin, nmax, order=4, known_moments=[], block='up_0', orb=0, xlim=(0, 40), ylim=(-1.5, 0.1)):
+def fit_tail(G_inp, w_min, w_max, order=4, known_moments=[], fit_sigma=False):
 
-    beta = S_iw[block].mesh.beta
 
-    mesh = np.array([w.imag for w in S_iw[block].mesh])
+    if isinstance(G_inp, BlockGf):
+        res_list = []
+        for block, gf in G_inp:
+            res_list.append(fit_tail(gf, w_min, w_max, order, known_moments,fit_sigma))
 
-    S_iw_mfit = S_iw.copy()
-    print(block)
-    if not known_moments:
-        shape = [0] + list(S_iw_mfit[block].target_shape)
+        return BlockGf(name_list=list(G_inp.indices),block_list=res_list)
 
-        known_moments = np.zeros(shape, dtype=np.complex)
+    G_iw = G_inp.copy()
+    if known_moments==[]:
+        # if fitting a self-energy we do not have any prior knowledge on tail
+        if fit_sigma:
+            shape = [0] + list(G_iw.target_shape)
+            known_moments = np.zeros(shape, dtype=complex)
+        else:
+            known_moments = make_zero_tail(G_iw, 2)
 
-    o_min = (2*nmin+1)*np.pi/beta
+    n_min = int(0.5*(w_min*G_iw.mesh.beta/np.pi - 1.0))
+    n_max = int(0.5*(w_max*G_iw.mesh.beta/np.pi - 1.0))
+    tail, err = G_iw.fit_hermitian_tail_on_window(n_min=n_min,
+                                                  n_max=n_max,
+                                                  known_moments=known_moments,
+                                                  n_tail_max=4*len(G_iw.mesh),
+                                                  expansion_order=order)
+    G_iw.replace_by_tail(tail, n_max)
 
-    o_max = (2*nmax+1)*np.pi/beta
-    for block, Gf_bl in S_iw_mfit:
-        tail, err = S_iw_mfit[block].fit_hermitian_tail_on_window(n_min=nmin,
-                                                                  n_max=nmax,
-                                                                  known_moments=known_moments,
-                                                                  n_tail_max=2 *
-                                                                  len(S_iw_mfit.mesh),
-                                                                  expansion_order=order)
-
-        S_iw_mfit[block].replace_by_tail(tail, nmax)
-
-        S_iw_mfit[block].replace_by_tail(tail, nmax)
-
-    fig, (ax1) = plt.subplots(1, 1, figsize=(16, 10))
-
-    ax1.axvline(x=o_min, color='k', label='window')
-    ax1.axvline(x=o_max, color='k')
-
-    ax1.plot(mesh, S_iw[block][orb, orb].data.imag, 'o', lw=3, label='raw', markersize=4)
-    ax1.plot(mesh, S_iw_mfit[block][orb, orb].data.imag, '-', lw=3, label='fit')
-
-    ax1.set_xlim(xlim)
-    ax1.set_ylim(ylim)
-    ax1.set_ylabel(r"$Im \Sigma (i \omega)$")
-    ax1.set_xlabel(r"$\omega$")
-
-    ax1.legend(loc='lower right', ncol=1, numpoints=1, handlelength=1, fancybox=True,
-               labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
-
-    plt.show()
-
-    return S_iw_mfit
+    return G_iw
 
 
 def extract_Z_visual(h5, order=4, start=0, fitpoints=7, imp=0, plot=False, it='last_iter', xlim=[0, 2], ylim=[-2.0, 0.05]):

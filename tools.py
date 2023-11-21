@@ -6,6 +6,7 @@ import scipy as sp
 import scipy.integrate as integrate
 
 def set_plot_params():
+    import matplotlib as mpl
     import seaborn as sns
     import scienceplots
     np.set_printoptions(precision=6, suppress=True, linewidth=200)
@@ -13,6 +14,9 @@ def set_plot_params():
     # notebook switches of latex rendering
     plt.style.use(['science','notebook'])
     sns.set_palette('muted')
+    mpl.rcParams['figure.facecolor'] = (1,1,1,0)
+    mpl.rcParams['figure.edgecolor'] = (1,1,1,0)
+    mpl.rcParams['axes.facecolor'] = (1,1,1,0)
 
 def rotation_matrix(axis, theta):
     import numpy as np
@@ -35,45 +39,45 @@ def rotation_matrix(axis, theta):
 
 
 def find_supercell(prim_cell, super_cell):
-    
+
     '''
-    Given two paths to a structure file, returns the transformation M from 
+    Given two paths to a structure file, returns the transformation M from
     primitive to supercell and the corresponding reciprocal transformation
     matrix. For more info see:
     math.stackexchange.com/questions/1078157/components-of-vector-in-dual-basis-transform-covariantly
-    
+
     and
-    
+
     github.com/QijingZheng/VaspBandUnfolding/blob/master/unfold.py
-    
+
     Let M the transformation matrix between supercell and primitive cell,
     and A the column wise supercell vectors and a the column wise primitive
     cell vectors. Then M is given as:
-            M = np.dot(A, np.linalg.inv(a)) 
-    
+            M = np.dot(A, np.linalg.inv(a))
+
     In real space, the basis vectors of Supercell (A) and those of the
     primitive cell (a) satisfy:
             A = np.dot(M, a);      a = np.dot(np.linalg.inv(M), A)
-    
+
     Whereas in reciprocal space
-            b = np.dot(M.T, B);    B = np.dot(np.linalg.inv(M).T, b)            
-    
+            b = np.dot(M.T, B);    B = np.dot(np.linalg.inv(M).T, b)
+
     uses pymatgen to load structure files and match the structures
-            
+
     '''
-    
+
     from pymatgen.analysis.structure_matcher import StructureMatcher
     from pymatgen.core import Structure
-    
+
     PC = Structure.from_file(prim_cell)
     SC = Structure.from_file(super_cell)
-    
+
     sm = StructureMatcher(primitive_cell=False, attempt_supercell=True)
-    
+
     trans, shift, match_atoms = sm.get_transformation(SC, PC)
-    
+
     k_trans = np.linalg.inv(trans).T
-    
+
     return trans, k_trans, shift
 
 def ext_fermi_energy(path):
@@ -122,7 +126,7 @@ def ext_bands(path, efermi= None, spin= False):
     "extracting the band form the eignval file from VASP"
     if efermi == None:
         efermi = ext_fermi_energy(path)
-    
+
     basis = ext_rbasis(path)
 
     #reading the file
@@ -171,7 +175,7 @@ def ext_bands(path, efermi= None, spin= False):
             value=value+'  '+ev
         bands_up.write(str(float(klen))+'  '+str(line)+'  '+value+'\n')
 
-        if spin: 
+        if spin:
             value=''
             for y in range(nmin,nmax):
                 zeile=data[7+x*(nbands+2)+1+y].split()
@@ -234,11 +238,11 @@ def linefit_real_freq(x,y,interval,spacing=50,addspace=0.0):
 
 
 def extract_bandwidth_h5(h5):
-    
+
     with HDFArchive(h5,'r') as h5:
         ek = h5['dft_input']['hopping']
-    
-    bandwidth = 0.0 
+
+    bandwidth = 0.0
     ev_min = 2000
     ev_max = -2000
     for h_k in ek[:,0]:
@@ -249,15 +253,15 @@ def extract_bandwidth_h5(h5):
             ev_min = ev.min()
         if largest_ev > ev_max:
             ev_max = largest_ev
-    
-    
+
+
     return abs(ev_max-ev_min)
 
 def double_counting_ani(U, J, n_orb, occ):
-    
+
     '''
     small function to calculate double counting via Held / Anisimov formula for Kanamori Hamiltonians
-    
+
     parameters
     ----------
     U : float
@@ -266,34 +270,34 @@ def double_counting_ani(U, J, n_orb, occ):
         J value
     n_orb : int
         number of orbitals
-    occ : float 
+    occ : float
         nomber of electrons
-        
+
     returns
     -------
-    dc_pot : float 
+    dc_pot : float
         double counting potential
     dc_en : float
         double counting energy
     '''
-    
+
     U_bar = (U + (n_orb-1)*(U-2*J) + (n_orb-1)*(U-3*J))/(2*n_orb -1)
-    
+
     dc_en = 0.5*U_bar*occ*(occ-1)
     dc_pot = U_bar*(occ-0.5)
-    
+
     return dc_pot, dc_en
 
 def mesh_to_np_arr(mesh):
     from triqs.gf import MeshImTime, MeshReFreq, MeshImFreq
-    
+
     if isinstance(mesh, MeshReFreq):
-        mesh_arr = np.linspace(mesh.omega_min, mesh.omega_max, len(mesh))
+        mesh_arr = np.linspace(mesh.w_min, mesh.w_max, len(mesh))
     elif isinstance(mesh, MeshImFreq):
         mesh_arr = np.linspace(mesh(mesh.first_index()).imag, mesh(mesh.last_index()).imag, len(mesh))
     elif isinstance(mesh, MeshImTime):
         mesh_arr = np.linspace(0, mesh.beta, len(mesh))
     else:
         raise AttributeError('input mesh must be either MeshReFreq, MeshImFreq, or MeshImTime')
-        
+
     return mesh_arr
