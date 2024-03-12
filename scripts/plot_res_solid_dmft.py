@@ -3,7 +3,7 @@ import sys
 import glob
 
 import matplotlib
-matplotlib.use('TkAgg')
+# matplotlib.use('QtAgg')
 import matplotlib.pyplot as plt
 
 from h5 import HDFArchive
@@ -17,7 +17,7 @@ print('plot solid_dmft results. Pass as argument the name of h5 file and quantit
 
 def _mesh_to_np_arr(mesh):
     from triqs.gf import MeshImTime, MeshReFreq, MeshImFreq
-    
+
     if isinstance(mesh, MeshReFreq):
         mesh_arr = np.linspace(mesh.omega_min, mesh.omega_max, len(mesh))
     elif isinstance(mesh, MeshImFreq):
@@ -26,7 +26,7 @@ def _mesh_to_np_arr(mesh):
         mesh_arr = np.linspace(0, mesh.beta, len(mesh))
     else:
         raise AttributeError('input mesh must be either MeshReFreq, MeshImFreq, or MeshImTime')
-        
+
     return mesh_arr
 
 h5_file = glob.glob(sys.argv[1])[0]
