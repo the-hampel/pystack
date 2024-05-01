@@ -10,6 +10,8 @@ import scipy as sp
 from glob import glob
 from os.path import basename
 
+from tools import mesh_to_np_arr
+
 import warnings
 warnings.filterwarnings("ignore")  # ignore some matplotlib warnings
 
@@ -78,6 +80,37 @@ def fit_tail(G_inp, w_min, w_max, order=4, known_moments=[], fit_sigma=False):
 
 
 def extract_Z_visual(h5, order=4, start=0, fitpoints=7, imp=0, plot=False, it='last_iter', xlim=[0, 2], ylim=[-2.0, 0.05]):
+    '''
+    Extracts the QP weight Z from the self-energy
+
+    Parameters:
+    -----------
+    h5 : str
+        Path to the h5 file containing the self-energy or triqs gf object
+    order : int (default=4)
+        Order of the polynomial fit
+    start : int (default=0)
+        Start point of the fit
+    fitpoints : int (default=7)
+        Number of points to fit
+    imp : int (default=0)
+        Impurity index
+    plot : bool (default=False)
+        Plot the self-energy and the fit
+    it : str (default='last_iter')
+        Iteration to extract the self-energy from
+    xlim : list (default=[0, 2])
+        x-axis limits of the plot
+    ylim : list (default=[-2.0, 0.05])
+        y-axis limits of the plot
+
+    Returns:
+    --------
+    Z : dict
+        Dictionary containing the QP weight for each block and orbital
+    scat : dict
+        Dictionary containing the scattering rate for each block and orbital
+    '''
 
     if plot:
         xp = np.linspace(-1, 5, 500)
@@ -88,10 +121,8 @@ def extract_Z_visual(h5, order=4, start=0, fitpoints=7, imp=0, plot=False, it='l
         ax1.set_ylim(ylim)
         ax1.set_ylabel(r"$Im \Sigma (i \omega)$")
 
-    Z_t2g = []
-    Z_eg = []
-    scat_t2g = []
-    scat_eg = []
+    Z = {}
+    scat = {}
 
     if isinstance(h5, str):
         with HDFArchive(h5, 'r') as h5:
@@ -103,45 +134,39 @@ def extract_Z_visual(h5, order=4, start=0, fitpoints=7, imp=0, plot=False, it='l
         Sigma_iw = h5
 
     # average of up / down
-    for blck, S_blck in Sigma_iw:
-        if 'up' in blck:
-            nblck_no = blck.split('_')[-1]
-            S_iw_avg = 0.5*(Sigma_iw[blck] + Sigma_iw['down_'+nblck_no])
+    iw = [np.imag(n) for n in Sigma_iw.mesh]
+    n_iw0 = int(0.5*len(iw))
+    for blck, S_iw in Sigma_iw:
+        Z[blck] = []
+        scat[blck] = []
 
-            iw = [np.imag(n) for n in S_blck.mesh]
-            n_iw0 = int(0.5*len(iw))
+        for orb in range(0, S_iw.target_shape[0]):
+            Im_S_iw = S_iw[orb, orb].data.imag
+            # simple extraction from S_iw_0
+            Z_simple = 1/(1 - (Im_S_iw[n_iw0+start]/iw[n_iw0+start]))
 
-            for orb in range(0, S_iw_avg.target_shape[0]):
-                Im_S_iw = S_iw_avg[orb, orb].data.imag
-                # simple extraction from S_iw_0
-                Z_simple = 1/(1 - (Im_S_iw[n_iw0+start]/iw[n_iw0+start]))
+            p_fit = np.polyfit(iw[n_iw0+start:n_iw0+start+fitpoints],
+                               Im_S_iw[n_iw0+start:n_iw0+start+fitpoints], order)
+            p_der = np.polyder(p_fit)
+            Z_fit = 1.0/(1.0 - np.polyval(p_der, 0.0))
+            scat_fit = -1*np.polyval(p_fit, 0.0)
+            scat_fit_d = np.poly1d(p_fit)
 
-                p_fit = np.polyfit(iw[n_iw0+start:n_iw0+start+fitpoints],
-                                   Im_S_iw[n_iw0+start:n_iw0+start+fitpoints], order)
-                p_der = np.polyder(p_fit)
-                Z_fit = 1.0/(1.0 - np.polyval(p_der, 0.0))
-                scat_fit = -1*np.polyval(p_fit, 0.0)
-                scat_fit_d = np.poly1d(p_fit)
+            Z[blck].append(Z_fit)
+            scat[blck].append(scat_fit)
 
-                if Z_simple < 0.85:
-                    Z_t2g.append(Z_fit)
-                    scat_t2g.append(scat_fit)
-                else:
-                    Z_eg.append(Z_fit)
-                    scat_eg.append(scat_fit)
-
-                if plot:
-                    # Sigma
-                    ax1.plot(iw, Im_S_iw, 'o', label=orb)
-                    ax1.plot(xp, scat_fit_d(xp),
-                             '-', lw='1.5')
+            if plot:
+                # Sigma
+                ax1.plot(iw, Im_S_iw, 'o', label=orb)
+                ax1.plot(xp, scat_fit_d(xp),
+                         '-', lw='1.5')
 
     if plot:
         ax1.legend(loc='upper right', ncol=1, numpoints=1, handlelength=1, fancybox=True,
                    labelspacing=0.2, borderaxespad=0.5, borderpad=0.35, handletextpad=0.4)
         plt.show()
 
-    return Z_t2g, Z_eg, scat_t2g, scat_eg
+    return Z, scat
 
 
 def plot_conv_obs(h5, site=0, dpi=120):
@@ -307,3 +332,30 @@ def smear_PES(x_array, y_array, e_f, eps):
     y_array[x_to_modify] = lorentzian(x_array[x_to_modify], e_f - eps, lor_max, eps)
 
     return y_array
+
+def plot_sigma_w(S_w, ax, color, label='', marker='-', subtract=True):
+    mesh = mesh_to_np_arr(S_w.mesh)
+    mid = len(mesh)//2
+    if subtract:
+        ax[0].plot(mesh, S_w.data[:,0,0].real-S_w.data[mid,0,0].real, marker, color = color, label=label)
+    else:
+        ax[0].plot(mesh[:], S_w.data[:,0,0].real, marker, color = color, label=label)
+    ax[1].plot(mesh, -1*S_w.data[:,0,0].imag, marker, color = color, label=label)
+    return
+
+def plot_sigma_iw(S_iw, ax, color, label='', marker='-o', subtract=True):
+    mesh = mesh_to_np_arr(S_iw.mesh)
+    mid = len(mesh)//2
+    if subtract:
+        ax[0].plot(mesh[mid:], S_iw.data[mid:,0,0].real-S_iw.data[-1,0,0].real, marker, color = color, label=label)
+    else:
+        ax[0].plot(mesh[mid:], S_iw.data[mid:,0,0].real, marker, color = color, label=label)
+    ax[1].plot(mesh[mid:], S_iw.data[mid:,0,0].imag, marker, color = color, label=label)
+    return
+
+def plot_sigma_iw_im(S_iw, ax, color, label='', marker='-o',):
+    mesh = mesh_to_np_arr(S_iw.mesh)
+    mid = len(mesh)//2
+    ax.plot(mesh[mid:], S_iw.data[mid:,0,0].imag, marker, color = color, label=label)
+
+    return
