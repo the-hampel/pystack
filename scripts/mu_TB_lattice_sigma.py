@@ -13,24 +13,25 @@ from triqs.gf import MeshDLRImFreq, Gf, MeshImFreq
 from triqs.lattice.utils import TB_from_wannier90
 from triqs.plot.mpl_interface import oplot, plt
 
-np.set_printoptions(precision=4, suppress=True)
+np.set_printoptions(precision=4, suppress=True, linewidth=200)
 
 # ------------------------------#
 # parameters
-w90_seed = 'sro'
+w90_seed = 'lvo_rot'
 w90_path = './'
-n_orb = 3
+n_orb = 12
 sites = 1
-n_elect = 0.5
+n_elect = 3.0
 spin = None
 
 k_dim = 21
-beta = 5.0
-dlr_wmax = 5
-dlr_eps = 1e-8
+beta = 1000.0
+# dlr_wmax = [1,2,4,5,8,10,12,15,20,25,30,40,50,80,100]
+dlr_wmax = [5]
+dlr_eps = 1e-10
 
 # window to seach for mu
-search_win = [10, 20]
+search_win = [8, 12]
 
 store = f'b{beta:.0f}_k{k_dim:.0f}_res.h5'
 # ------------------------------#

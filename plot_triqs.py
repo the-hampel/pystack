@@ -113,7 +113,7 @@ def extract_Z_visual(h5, order=4, start=0, fitpoints=7, imp=0, plot=False, it='l
     '''
 
     if plot:
-        xp = np.linspace(-1, 5, 500)
+        xp = np.linspace(-1, 5, 50000)
 
         fig, (ax1) = plt.subplots(1, 1, figsize=(8, 5), dpi=150)
         fig.subplots_adjust(wspace=0.3)
@@ -350,12 +350,12 @@ def plot_sigma_iw(S_iw, ax, color, label='', marker='-o', subtract=True):
         ax[0].plot(mesh[mid:], S_iw.data[mid:,0,0].real-S_iw.data[-1,0,0].real, marker, color = color, label=label)
     else:
         ax[0].plot(mesh[mid:], S_iw.data[mid:,0,0].real, marker, color = color, label=label)
-    ax[1].plot(mesh[mid:], S_iw.data[mid:,0,0].imag, marker, color = color, label=label)
+    ax[1].plot(mesh[mid:], -1*S_iw.data[mid:,0,0].imag, marker, color = color, label=label)
     return
 
 def plot_sigma_iw_im(S_iw, ax, color, label='', marker='-o',):
     mesh = mesh_to_np_arr(S_iw.mesh)
     mid = len(mesh)//2
-    ax.plot(mesh[mid:], S_iw.data[mid:,0,0].imag, marker, color = color, label=label)
+    ax.plot(mesh[mid:], -1*S_iw.data[mid:,0,0].imag, marker, color = color, label=label)
 
     return
