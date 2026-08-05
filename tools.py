@@ -11,7 +11,7 @@ def set_plot_params():
     import scienceplots
     np.set_printoptions(precision=6, suppress=True, linewidth=200)
     # set matplotlib parameters
-    # notebook switches of latex rendering
+    # notebook switches off latex rendering
     plt.style.use(['science','notebook'])
     sns.set_palette('muted')
     mpl.rcParams['figure.facecolor'] = (1,1,1,0)
